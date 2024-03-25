@@ -1,31 +1,39 @@
 import numpy as np
-from binarization import exp_golomb_coding
-from adaptiveEncode import AdaptiveArithmeticEncoder
-from contextModel import ContextModel
+from binarizer import Binarizer
+from regular_coding import RegularCodingEngine
+from bypass_coding import BypassCodingEngine
+from context_modeler import ContextModeler
 
 
 class CABAC:
 
     def __init__(self):
-        self.context_model = ContextModel()
-        self.arithmetic_encoder = AdaptiveArithmeticEncoder(self.context_model)
+        self.context_modeler = ContextModeler()
+        self.regular_coding_engine = RegularCodingEngine(self.context_modeler)
+        self.bypass_coding_engine = BypassCodingEngine()
+        self.binarizer = Binarizer()
 
     def encode(self, data_block):
-        """
-        Кодирует блок данных с использованием CABAC, применяя дифференциальное кодирование и контекстно-зависимую бинаризацию.
-        """
-        self.context_model.evaluate_data_characteristics(data_block)
+        bitstream = bytearray()
 
-        # Дифференциальное кодирование
-        diff_encoded_block = self.differential_encode(data_block)
+        for value in np.nditer(data_block):
+            # Бинаризация значения
+            bin_string = self.binarizer.binarize(int(value))
 
-        # Подготовка последовательности для арифметического кодирования
-        sequence = self.prepare_sequence(diff_encoded_block)
+            for bin_value in bin_string:
+                # Определение, какой движок кодирования использовать
+                if self.context_modeler.should_use_bypass(bin_value):
+                    # Использование BypassCodingEngine для бинарных значений, которые следует кодировать напрямую
+                    coded_bits = self.bypass_coding_engine.encode(bin_value)
+                else:
+                    # Использование RegularCodingEngine для бинарных значений, требующих контекстной модели
+                    coded_bits = self.regular_coding_engine.encode(bin_value, self.context_modeler.get_probabilities())
 
-        # Кодирование последовательности
-        encoded_value = self.arithmetic_encoder.encode_sequence(sequence)
+                # Добавление закодированных битов в итоговый битовый поток
+                bitstream.extend(coded_bits)
 
-        return encoded_value
+        # Возвращаем битовый поток как результат кодирования блока
+        return bitstream
 
     def differential_encode(self, data_block):
         """

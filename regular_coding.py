@@ -1,4 +1,4 @@
-class AdaptiveArithmeticEncoder:
+class RegularCodingEngine:
     def __init__(self, context_model):
         self.context_model = context_model  # Интеграция модели контекста
         self.symbol_models = self.init_symbol_models()
